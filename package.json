@@ -1,0 +1,23 @@
+{
+  "name": "oci-image-builder",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "docker-registry-client": "^3.3.1",
+    "micromatch": "^4.0.5",
+    "tar": "^6.1.13",
+    "walkdir": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/micromatch": "^4.0.2",
+    "@types/node": "^18.11.18",
+    "typescript": "^4.9.5"
+  }
+}
