@@ -22,7 +22,7 @@ export class Client {
     static build(source: RepositoryConfig,
                        files:[{
                             dir: string | { [dir: string]: string },
-                            targetDir?: string | PackOptions
+                            target?: string | PackOptions
                         }],
                        target: SyncOptions
 
@@ -41,7 +41,7 @@ export class Client {
             targetTags = res.tags;
             let fileTasks : Array<Promise<any>> = [];
             files.forEach((file)=>{
-                let p =  Client.addFiles(targetClient,targetImage,file.dir,file.targetDir).then((result:any)=>{
+                let p =  Client.addFiles(targetClient,targetImage,file.dir,file.target).then((result:any)=>{
                     return new Promise((layerResolve, layerReject)=>{
                         Client.addLayer(targetClient,targetImage,result.digest,result.uncompressedDigest,result.size);
                         layerResolve(result);
