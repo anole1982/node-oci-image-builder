@@ -5,4 +5,4 @@ export interface BasicCredential {
 export interface TokenCredential {
     token: string
 }
-export type AuthCredential = BasicCredential|TokenCredential;
+export type ImageCredential = BasicCredential|TokenCredential;

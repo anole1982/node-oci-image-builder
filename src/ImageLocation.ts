@@ -1,5 +1,9 @@
-import { AuthCredential } from "./Credential";
 export interface ImageLocation {
-    url: string
-    auth?: AuthCredential;
+    url: string;
+    protocol: string;
+    registry: string;
+    namespace?: string;
+    image?: string;
+    tag?: string;
+    digest?: string;
 }
