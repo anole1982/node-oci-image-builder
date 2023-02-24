@@ -20,11 +20,11 @@ export class Client {
      * @param target 目标镜像
      */
     static build(source: RepositoryConfig,
-                       files:[{
-                            dir: string | { [dir: string]: string },
-                            target?: string | PackOptions
-                        }],
-                       target: SyncOptions
+                 files:[{
+                     dir: string | { [dir: string]: string },
+                     target?: string | PackOptions
+                 }],
+                 target: SyncOptions
 
     ) {
         let targetClient:any;
@@ -41,16 +41,14 @@ export class Client {
             targetTags = res.tags;
             let fileTasks : Array<Promise<any>> = [];
             files.forEach((file)=>{
-                let p =  Client.addFiles(targetClient,targetImage,file.dir,file.target).then((result:any)=>{
-                    return new Promise((layerResolve, layerReject)=>{
-                        Client.addLayer(targetClient,targetImage,result.digest,result.uncompressedDigest,result.size);
-                        layerResolve(result);
-                    });
-                });
+                let p = Client.addFiles(targetClient,targetImage,file.dir,file.target);
                 fileTasks.push(p);
             });
             return Promise.all(fileTasks);
         }).then((res)=>{
+            res.forEach((result)=>{
+                Client.addLayer(targetClient,targetImage,result.digest,result.uncompressedDigest,result.size);
+            });
             return Client.putImageConfig(targetClient,targetImage);
         }).then((res)=>{
             if(res!=targetImage.manifest.config.digest) {
@@ -257,10 +255,10 @@ export class Client {
                 if (err) {
                     reject(err);
                 } else {
-                   Client.readAll(stream).then((data)=>{
-                       // @ts-ignore
-                       resolve(data);
-                   });
+                    Client.readAll(stream).then((data)=>{
+                        // @ts-ignore
+                        resolve(data);
+                    });
                 }
             });
         });
@@ -292,44 +290,37 @@ export class Client {
             // options!
             options = targetDir;
         }
-
-        return new Promise(async (resolve, reject) => {
-
-            const tarStream = pack(dir, options);
-
-            tarStream.on('error', (e: Error) => reject(e));
-
-            const gzip = zlib.createGzip();
-
-            const uncompressedHash = crypto.createHash('sha256');
-
-            tarStream.on('data', (buf: Buffer) => {
-                uncompressedHash.update(buf);
-            });
-
-            tarStream.pipe(gzip);
-            // @ts-ignore
-            Client.streamToBuffer(tarStream).then((buffer)=>{
-                let contentLength = buffer.byteLength;
+        const tarStream = pack(dir, options);
+        let uncompressedDigest:string;
+        return Client.streamToBuffer(tarStream).then((tar)=>{
+            return new Promise((resolve, reject) => {
                 // @ts-ignore
-                let digest = 'sha256:' + crypto.createHash('sha256').update(buffer).digest('hex');
-                return new Promise((uploadResolve,updateReject)=>{
-                    let stream = Client.bufferToStream(buffer);
-                    let upOpt = {contentLength:contentLength,digest:digest,stream: stream};
-                    tagetClient.blobUpload(upOpt,function(err:Error, res:Response){
-                        if(!!err) {
-                            console.log("上传静态资源层数据失败");
-                            reject(err);
-                        } else {
-                            console.log("上传静态资源层数据成功");
-                            const uncompressedDigest = 'sha256:' + uncompressedHash.digest('hex');
-                            // @ts-ignore
-                            resolve( {digest: res.headers['docker-content-digest'], uncompressedDigest:uncompressedDigest, size:contentLength});
-                        }
-                    });
+                uncompressedDigest = 'sha256:' + crypto.createHash('sha256').update(tar).digest('hex');
+                // @ts-ignore
+               zlib.gzip(tar,(err,zipdata)=>{
+                   if(!!err){
+                       reject(err);
+                   } else {
+                       resolve(zipdata);
+                   }
+               });
+            });
+            // @ts-ignore
+        }).then((gzip:Buffer)=>{
+            let stream = Client.bufferToStream(gzip);
+            let digest = 'sha256:' + crypto.createHash('sha256').update(gzip).digest('hex');
+            let upOpt = {contentLength:gzip.byteLength,digest:digest,stream: stream};
+            return new Promise((uploadResolve,updateReject)=>{
+                tagetClient.blobUpload(upOpt,function(err:Error, res:Response){
+                    if(!!err) {
+                        console.log("上传静态资源层数据失败");
+                        updateReject(err);
+                    } else {
+                        console.log("上传静态资源层数据成功");
+                        // @ts-ignore
+                        uploadResolve( {digest: res.headers['docker-content-digest'], uncompressedDigest:uncompressedDigest, size:gzip.byteLength});
+                    }
                 });
-            }).catch((err:Error)=>{
-                console.log(err);
             });
         });
     }
@@ -385,9 +376,15 @@ export class Client {
             let buffers = [];
             stream.on('error', reject);
             // @ts-ignore
-            stream.on('data', (data) => buffers.push(data));
+            stream.on('data', (data) => {
+                // @ts-ignore
+                buffers.push(data);
+            });
             // @ts-ignore
-            stream.on('end', () => resolve(Buffer.concat(buffers)));
+            stream.on('end', () => {
+                // @ts-ignore
+                resolve(Buffer.concat(buffers));
+            });
         });
     }
     static bufferToStream(buffer:ArrayBuffer) {

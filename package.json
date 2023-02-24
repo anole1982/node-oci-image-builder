@@ -1,10 +1,11 @@
 {
   "name": "node-oci-image-builder",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "dist/index.js",
   "type": "commonjs",
   "scripts": {
+    "deploy": "node --inspect ./deploy/index.js",
     "start": "tsc --watch",
     "compile": "tsc -p .",
     "fix": "gts fix",
@@ -15,7 +16,12 @@
     "version": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0 && git add CHANGELOG.md",
     "env": "env"
   },
-  "keywords": ["nodejs","oci","docker","image"],
+  "keywords": [
+    "nodejs",
+    "oci",
+    "docker",
+    "image"
+  ],
   "author": "johnson.s.zhang@foxmail.com",
   "license": "MIT",
   "dependencies": {
