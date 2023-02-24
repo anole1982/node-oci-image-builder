@@ -75,7 +75,7 @@ export class Client {
         let image = {manifest:manifest, config:config};
         return {image:image,client: client};
     }
-    static sync(sourceTarget:any,sourceImage:any,options: SyncOptions): Promise<{image:any,client:any,tags:Array<string>}> {
+    static sync(sourceClient:any,sourceImage:any,options: SyncOptions): Promise<{image:any,client:any,tags:Array<string>}> {
         let tags:Array<string> = [];
         if(!options.tags){
             tags.push("latest");
@@ -91,9 +91,8 @@ export class Client {
         console.log("开始同步");
         options = Object.assign({copyRemoteLayers: true, ignoreExists: true}, options);
         return Client.buildClient(options.repo).then((targetClient)=>{
-            const copyTasks: Array<Promise<any>> = this.syncLayers(sourceTarget,targetClient,sourceImage.manifest,true);
-            copyTasks.push(this.syncConfig(targetClient,sourceImage.config,layerMediaType));
-            let mainfest = sourceImage.manifest;
+            const copyTasks: Array<Promise<any>> = this.syncLayers(sourceClient,targetClient,sourceImage,true);
+            copyTasks.push(this.syncConfig(sourceClient,targetClient,sourceImage,layerMediaType));
             return new Promise((resolve, reject) => {
                 Promise.all(copyTasks).then((ress)=>{
                     return Client.syncManifest(targetClient,sourceImage,tags);
@@ -104,14 +103,15 @@ export class Client {
         });
     }
 
-    private static syncLayers(sourceTarget:any,targetClient:any,manifest: ImageManifest,ignoreExists:boolean){
+    private static syncLayers(sourceClient:any,targetClient:any,sourceImage: any,ignoreExists:boolean){
+        let manifest = sourceImage.manifest;
         const copyTasks: Array<Promise<any>> = [];
         manifest.layers.forEach((layer: { digest: string; size: number; }) => {
             let p = Client.existBlob(targetClient, layer.digest).then((exists: boolean) => {
                 console.log("判断目标仓库是否存在了数据");
                 if (!exists || !ignoreExists) {
                     console.log("不存在进行复制数据");
-                    return Client.getBlob(sourceTarget,layer.digest).then((data) => {
+                    return Client.getBlob(sourceClient,layer.digest).then((data) => {
                         console.log("获取数据成功");
                         return new Promise((uploadResolve,updateReject)=>{
                             let stream = Client.bufferToStream(data);
@@ -141,29 +141,29 @@ export class Client {
         });
         return copyTasks;
     }
-    private static syncConfig(targetClient:any,config:any,mediaType:string): Promise<ImageLayer> {
-        let configData = Buffer.from(JSON.stringify(config));
-        let configlayerDigest = 'sha256:' + crypto.createHash('sha256').update(configData).digest('hex');
-        let stream = Client.bufferToStream(configData);
-        let upOpt = {contentLength: configData.length, digest: configlayerDigest, stream: stream,};
-        return new Promise((uploadResolve,updateReject)=>{
-            targetClient.blobUpload(upOpt,function(err:Error, res:Response) {
-                if (!err) {
-                    console.log("上传配置信息数据成功");
-                    const layerResult = {
-                        type: "CONFIG",
+    private static syncConfig(sourceClient:any,targetClient:any,sourceImage:any,mediaType:string): Promise<ImageLayer> {
+        return Client.getBlob(sourceClient,sourceImage.manifest.config.digest).then((data: Uint8Array)=>{
+            let stream = Client.bufferToStream(data);
+            let upOpt = {contentLength: sourceImage.manifest.config.size, digest: sourceImage.manifest.config.digest, stream: stream};
+            return new Promise((uploadResolve,updateReject)=>{
+                targetClient.blobUpload(upOpt,function(err:Error, res:Response) {
+                    if (!err) {
+                        console.log("上传配置信息数据成功");
+                        const layerResult = {
+                            type: "CONFIG",
+                            // @ts-ignore
+                            digest: res.headers['docker-content-digest'],
+                            mediaType: mediaType,
+                            uncompressedDigest: sourceImage.manifest.config.digest,
+                            size: sourceImage.manifest.config.size
+                        };
                         // @ts-ignore
-                        digest: res.headers['docker-content-digest'],
-                        mediaType: mediaType,
-                        uncompressedDigest: configlayerDigest,
-                        size: configData.length
-                    };
-                    // @ts-ignore
-                    uploadResolve(layerResult);
-                } else {
-                    console.log("上传配置信息数据失败");
-                    updateReject(err);
-                }
+                        uploadResolve(layerResult);
+                    } else {
+                        console.log("上传配置信息数据失败");
+                        updateReject(err);
+                    }
+                });
             });
         });
     }
