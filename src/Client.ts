@@ -32,7 +32,7 @@ export class Client {
         let targetTags:any;
         Client.image(source).then((res)=>{
             let {image,client} = res;
-            return Client.sync(client,image,target);
+            return Client.syncImage(client,image,target);
         }).then((res)=>{
             //:{ image: any,client: any,tags: Array<string>}
             console.log("获取镜像数据完成");
@@ -61,6 +61,16 @@ export class Client {
             console.log(JSON.stringify(res,null,4));
         });
     }
+    static sync(source: RepositoryConfig,
+                 target: SyncOptions){
+        Client.image(source).then((res)=>{
+            let {image,client} = res;
+            return Client.syncImage(client,image,target);
+        }).then((res)=>{
+            // console.log(res);
+            console.log("镜像同步完成");
+        });
+    }
     /**
      * 获取镜像数据
      */
@@ -73,7 +83,7 @@ export class Client {
         let image = {manifest:manifest, config:config};
         return {image:image,client: client};
     }
-    static sync(sourceClient:any,sourceImage:any,options: SyncOptions): Promise<{image:any,client:any,tags:Array<string>}> {
+    static syncImage(sourceClient:any,sourceImage:any,options: SyncOptions): Promise<{image:any,client:any,tags:Array<string>}> {
         let tags:Array<string> = [];
         if(!options.tags){
             tags.push("latest");
@@ -119,7 +129,7 @@ export class Client {
                                     console.log("上传数据失败");
                                     updateReject(err);
                                 } else {
-                                    console.log("上传数据成功");
+                                    console.log("上传数据成功",layer.digest,layer.size);
                                     const layerResult = {
                                         type: "LAYER",
                                         // @ts-ignore
@@ -404,6 +414,17 @@ export class Client {
                     username: repo.auth.username,
                     // @ts-ignore
                     password: repo.auth.password,
+                    version: 2
+                }, function (err: Error, client: any) {
+                    resolve(client);
+                });
+            }else if (repo.auth && "token" in repo.auth && repo.auth.token) {
+
+            } else {
+                createClient({
+                    name: `${location.protocol}://${location.registry}/${location.namespace}/${location.image}`,
+                    username :"",
+                    password :"",
                     version: 2
                 }, function (err: Error, client: any) {
                     resolve(client);
